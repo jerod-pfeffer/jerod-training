@@ -1,12 +1,12 @@
 # Training / Crimpium — Block planner
 
-A single-file GitHub Pages app that lays out each training block as a week you can rearrange. Same architecture as the TB2 schedule app: the plan lives in the repo, the page reads it from there, and a fine-grained token kept on your phone lets the app save back.
+A small GitHub Pages app that lays out each training block as a week you can rearrange. Same architecture as the TB2 schedule app: the plan lives in the repo, the page reads it from there, and a fine-grained token kept on your phone lets the app save back.
 
 ## Files
 
 | File | What it is | Who writes it |
 |---|---|---|
-| `index.html` | The app | — |
+| `index.html`, `app.css`, `app.js`, `ui.js` | The app (markup, styles, core logic, rendering) | — |
 | `program.json` | Every block, in order. Block 1 (v4) is already in it | Claude produces each new block; you paste it in the app |
 | `state.json` | Your day moves, check-offs, and notes | The app |
 | `icon.png` | Home-screen icon | — |
@@ -14,7 +14,7 @@ A single-file GitHub Pages app that lays out each training block as a week you c
 ## One-time setup (~5 minutes, same steps as the TB2 app)
 
 1. **New repo** on github.com named `training-block` (any name works — the app reads the repo name from its own URL). Public is fine: the plan isn't sensitive, and public keeps reading token-free.
-2. **Upload** the four files above to the repo root (Add file → Upload files).
+2. **Upload** the files above to the repo root (Add file → Upload files).
 3. **Enable Pages:** Settings → Pages → Source: *Deploy from a branch* → `main` / root → Save. The app appears at `https://jerod-pfeffer.github.io/training-block/` within a minute or two.
 4. **Token:** the app needs a token that can write to *this* repo only. On github.com: Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token. Repository access: *Only select repositories* → `training-block`. Permissions → Repository permissions → **Contents: Read and write**. Longest expiration offered. (Your TB2 token is scoped to the TB2 repo, so it won't work here — this needs its own.)
 5. **On your phone:** open the URL in Safari → Share → **Add to Home Screen**. Open it, tap ⚙, paste the token, Save. The status line at the bottom should read *Synced*.
