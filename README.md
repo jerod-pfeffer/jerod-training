@@ -1,4 +1,4 @@
-# Training / Crimpium — Block planner
+# Jerod Training — Block planner
 
 A small GitHub Pages app that lays out each training block as a week you can rearrange. Same architecture as the TB2 schedule app: the plan lives in the repo, the page reads it from there, and a fine-grained token kept on your phone lets the app save back.
 
