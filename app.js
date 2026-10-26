@@ -246,7 +246,6 @@ function saveSessionLog(slot, sid, ds, title, note, loads, flipDone){
     for (const key of Object.keys(loads || {})){ const x = loads[key] || {}; setLoad(st, key, ds, x.v, x.r); }
     if (willDone !== null){ if (willDone) st.done[k] = true; else delete st.done[k]; }
   }, (willDone === null ? 'log: ' : (willDone ? 'done: ' : 'undo: ')) + title);
-  if (willDone === null) toast('Saved');
 }
 function pruneState(st){
   const keep = fmtDate(addDays(startOfWeek(new Date()), -7 * 26));
@@ -256,29 +255,41 @@ function pruneState(st){
   if (!st.loads) st.loads = {};
   for (const k of Object.keys(st.loads)){ const a = st.loads[k]; if (!Array.isArray(a) || !a.length) delete st.loads[k]; else if (a.length > 16) st.loads[k] = a.slice(-16); }
 }
+/* Saves are queued and coalesced: several taps in a row become one or two commits instead of dropped saves. */
+let saveQueue = [];
 async function persist(mutator, summary){
   mutator(S.state);
   cacheSet();
   render();
   if (!S.repoCfg){ S.local = true; renderStatus(); return; }
   if (!S.token){ S.local = true; renderStatus(); toast('Read-only \u2014 add your token in settings to save'); return; }
-  if (saving){ S.local = true; renderStatus(); toast('Still saving the previous change\u2026'); return; }
+  saveQueue.push({ mutator, summary });
+  if (saving){ S.local = true; renderStatus(); return; }
+  await drainSaves();
+}
+async function drainSaves(){
   saving = true;
-  pruneState(S.state);
-  const msg = 'Plan: ' + summary;
   try {
-    S.stateSha = await gh.save(filePath(STATE_FILE), S.state, S.stateSha, msg);
-    S.lastSync = new Date(); S.loadError = null; S.local = false; renderStatus();
-  } catch(e){
-    if (e.status === 409 || e.status === 422){
+    while (saveQueue.length){
+      const batch = saveQueue.splice(0, saveQueue.length);
+      const msg = ('Plan: ' + batch.map(b => b.summary).join('; ')).slice(0, 180);
+      pruneState(S.state);
       try {
-        const fresh = await gh.load(filePath(STATE_FILE));
-        S.state = normalizeState(fresh.data);
-        mutator(S.state);
-        S.stateSha = await gh.save(filePath(STATE_FILE), S.state, fresh.sha, msg);
-        S.lastSync = new Date(); S.loadError = null; S.local = false; cacheSet(); render();
-      } catch(e2){ failSave(e2); }
-    } else failSave(e);
+        S.stateSha = await gh.save(filePath(STATE_FILE), S.state, S.stateSha, msg);
+        S.lastSync = new Date(); S.loadError = null; S.local = saveQueue.length > 0; renderStatus();
+      } catch(e){
+        if (e.status === 409 || e.status === 422){
+          try {
+            const fresh = await gh.load(filePath(STATE_FILE));
+            S.state = normalizeState(fresh.data);
+            for (const b of batch.concat(saveQueue)) b.mutator(S.state);
+            pruneState(S.state);
+            S.stateSha = await gh.save(filePath(STATE_FILE), S.state, fresh.sha, msg);
+            S.lastSync = new Date(); S.loadError = null; S.local = saveQueue.length > 0; cacheSet(); render();
+          } catch(e2){ failSave(e2); saveQueue = []; break; }
+        } else { failSave(e); saveQueue = []; break; }
+      }
+    }
   } finally { saving = false; }
 }
 function failSave(e){
