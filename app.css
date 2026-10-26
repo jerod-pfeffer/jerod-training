@@ -165,6 +165,21 @@
   .ex .exe{font-size:12px; color:var(--dim); margin-left:8px;}
   .ex a.vid{display:inline-block; margin-top:5px; font-size:12px; font-weight:600; color:var(--teal); text-decoration:none;}
   .ex a.vid::after{content:' \25B8';}
+  .ex .load{display:flex; align-items:center; gap:10px; margin-top:7px;}
+  .ex .load input{
+    width:118px; flex:0 0 auto; min-height:40px; padding:7px 10px; border-radius:8px; border:1px solid var(--line2);
+    background:var(--panel2); color:var(--ink); font-size:15px; font-family:var(--body);
+  }
+  .ex .load input::placeholder{color:var(--dim);}
+  .ex .load .last{font-size:12px; color:var(--mut); line-height:1.3; display:flex; flex-direction:column;}
+  .ex .load .last b{color:var(--ink); font-weight:600;}
+  .ex .load .last small{color:var(--dim); font-size:11px;}
+  .ex .load .sug{display:inline-block; text-align:left; color:var(--teal); font-size:12px; font-weight:600; min-height:24px; padding:1px 0;}
+  .ex .load .sug b{color:var(--teal); font-weight:700;}
+  .ex .rpe{display:inline-flex; align-items:center; gap:6px; margin-top:6px;}
+  .ex .rpe em{font-style:normal; font-family:var(--disp); font-weight:600; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-right:2px;}
+  .ex .rpebtn{min-width:38px; min-height:32px; border-radius:8px; border:1px solid var(--line2); background:var(--panel2); color:var(--mut); font-family:var(--disp); font-weight:600; font-size:15px;}
+  .ex .rpebtn.on{border-color:var(--teal); color:var(--teal); background:rgba(47,214,195,.1);}
 
   .donebtn{
     width:100%; min-height:50px; border-radius:var(--rad); font-family:var(--disp); font-weight:700; font-size:18px; letter-spacing:.08em; text-transform:uppercase;
