@@ -50,6 +50,11 @@
   .blockstrip .bs-week b{color:var(--teal); font-weight:700;}
   .blockstrip .bs-name{font-family:var(--disp); font-weight:600; font-size:13px; letter-spacing:.08em; text-transform:uppercase; color:var(--dim); white-space:nowrap;}
   .blockstrip .bs-focus{margin:5px 0 0; font-size:13px; line-height:1.45; color:var(--mut);}
+  .blockstrip .bs-tally{margin:6px 0 0; font-size:12px; color:var(--mut);}
+  .blockstrip .bs-tally b{font-weight:600; color:var(--mut);}
+  .blockstrip .bs-tally b.d{color:var(--sage);}
+  .blockstrip .bs-tally b.s{color:var(--amber);}
+  .blockstrip .bs-tally small{color:var(--dim); font-size:11px;}
   .blockstrip.empty .bs-focus{color:var(--mut);}
   .blockstrip.empty .bs-focus u{color:var(--teal); text-decoration:none; font-weight:600;}
 
@@ -92,6 +97,11 @@
   .chip.done i{background:var(--sage); border-color:var(--sage);}
   .chip.done{color:var(--dim);}
   .card .moved{position:absolute; top:7px; right:9px; font-family:var(--disp); font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim);}
+  .card .tag-done{color:var(--sage);}
+  .card .tag-skip{color:var(--amber);}
+  .card.skipped{opacity:.6; border-style:dashed; background:var(--panel);}
+  .card.skipped .ttl{color:var(--mut); text-decoration:line-through; text-decoration-color:var(--dim);}
+  .card.skipped .chip{color:var(--dim);}
   .card.empty{justify-content:center; color:var(--dim); font-size:13px;}
   .grip{
     border-radius:var(--rad); border:1px solid var(--line); background:var(--panel); color:var(--dim);
@@ -189,6 +199,13 @@
     background:var(--teal); color:var(--bg); margin:4px 0 12px;
   }
   .donebtn.is-done{background:var(--panel2); color:var(--sage); border:1px solid var(--sage);}
+  .dayact{display:flex; gap:8px; align-items:stretch; margin:0 0 12px;}
+  .dayact .donebtn{flex:1; margin:0; font-size:16px;}
+  .dayact .btn{flex:0 0 auto; padding:0 14px; min-height:50px; font-size:15px;}
+  .daystate{flex:1; display:flex; align-items:center; padding:0 14px; min-height:50px; border-radius:var(--rad); border:1px dashed var(--amber); color:var(--amber); font-family:var(--disp); font-weight:700; font-size:17px; letter-spacing:.06em; text-transform:uppercase;}
+  .skipreasons{display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:-4px 0 12px;}
+  .skipreasons em{font-style:normal; font-family:var(--disp); font-weight:600; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-right:4px;}
+  .skipreasons .reason{min-height:36px; padding:0 14px; border-radius:999px; border:1px solid var(--line2); background:var(--panel2); color:var(--mut); font-family:var(--disp); font-weight:600; font-size:14px; letter-spacing:.06em; text-transform:uppercase;}
   .field{margin-bottom:12px;}
   .field label{display:block; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-bottom:5px; font-family:var(--disp); font-weight:600;}
   .field input, .field select, .field textarea{
