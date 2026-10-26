@@ -111,6 +111,9 @@ function openSession(i, sid){
   const s = cur.block.sessions[sid]; if (!s) return;
   S.open = { kind:'session', i, sid };
   const dn = isDone(day.slot, sid);
+  const ds = fmtDate(addDays(S.weekStart, i));
+  const logs = sessionLogsLoads(s);
+  const fmtShort = d => { const x = parseDate(d); return MONTHS[x.getMonth()] + ' ' + x.getDate(); };
   let h = '<button class="sh-back" id="btnBack">&#8249; ' + DOWS[i] + '</button>' +
     '<h2 class="sh-title">' + escapeHtml(s.title) + '</h2>' +
     '<p class="sh-sub">' + escapeHtml([s.subtitle, s.duration, 'Week ' + cur.weekIdx + ' of ' + cur.nWeeks].filter(Boolean).join(' \u00b7 ')) + '</p>';
@@ -124,16 +127,43 @@ function openSession(i, sid){
       if (it.thisWeek) h += '<p class="exw">' + escapeHtml(it.thisWeek) + '</p>';
       if (it.detail) h += '<p class="exd">' + escapeHtml(it.detail) + '</p>';
       if (it.video) h += '<a class="vid" href="' + escapeHtml(it.video) + '" target="_blank" rel="noopener">Watch how</a>';
+      if (logs && (it.sets || it.hasByWeek)){
+        const key = loadKey(sid, it.name);
+        const today = loadEntries(S.state, key).find(e => e && e.d === ds) || {};
+        const prev = loadsBefore(S.state, key, ds);
+        const fmtE = e => escapeHtml(e.v || '\u2014') + (Number.isFinite(e.r) ? ' @' + e.r : '');
+        let last = '';
+        if (prev.length){
+          const sug = suggestNext(prev[0]);
+          const why = sug ? ({ up:'try', hold:'hold at', 'hold-cap':'hold \u2014 over the cap at', repeat:'repeat' })[sug.why] : '';
+          last = '<span class="last"><span>Last <b>' + fmtE(prev[0]) + '</b> \u00b7 ' + fmtShort(prev[0].d) + '</span>' +
+            (sug && sug.v ? '<button type="button" class="sug" data-key="' + escapeHtml(key) + '" data-v="' + escapeHtml(sug.v) + '">\u2192 ' + why + ' <b>' + escapeHtml(sug.v) + '</b></button>' : '') +
+            (prev[1] ? '<small>Before: ' + fmtE(prev[1]) + ' \u00b7 ' + fmtShort(prev[1].d) + '</small>' : '') + '</span>';
+        } else last = '<span class="last"><small>First time \u2014 write the load you used, tap the RPE</small></span>';
+        let chips = '<span class="rpe" data-key="' + escapeHtml(key) + '"><em>RPE</em>';
+        for (const r of [6,7,8,9]) chips += '<button type="button" class="rpebtn' + (today.r === r ? ' on' : '') + '" data-r="' + r + '">' + r + '</button>';
+        chips += '</span>';
+        h += '<div class="load"><input class="loadin" data-key="' + escapeHtml(key) + '" placeholder="Load" value="' + escapeHtml(today.v || '') + '" autocomplete="off" autocapitalize="off" enterkeyhint="done">' + last + '</div>' + chips;
+      }
       h += '</div>';
     }
     h += '</div>';
   }
-  h += '<div class="field"><label for="fNote">Notes</label><textarea id="fNote" placeholder="Loads, RPE, how it felt\u2026">' + escapeHtml(noteFor(day.slot, sid)) + '</textarea></div>' +
-    '<div class="sh-actions"><button class="btn primary" id="btnNoteSave">Save note</button></div>';
+  h += '<div class="field"><label for="fNote">Notes</label><textarea id="fNote" placeholder="' + (logs ? 'RPE, bar speed, how it felt\u2026' : 'Attempts, sends, how it felt\u2026') + '">' + escapeHtml(noteFor(day.slot, sid)) + '</textarea></div>' +
+    '<div class="sh-actions"><button class="btn primary" id="btnNoteSave">' + (logs ? 'Save loads & note' : 'Save note') + '</button></div>';
   el.sheetBody.innerHTML = h;
+  const collectLoads = () => {
+    const o = {};
+    el.sheetBody.querySelectorAll('.loadin').forEach(inp => { o[inp.dataset.key] = { v: inp.value, r: null }; });
+    el.sheetBody.querySelectorAll('.rpe').forEach(g => { const on = g.querySelector('.rpebtn.on'); if (on && o[g.dataset.key]) o[g.dataset.key].r = +on.dataset.r; });
+    return o;
+  };
   $('btnBack').addEventListener('click', () => openDay(i));
-  $('btnDone').addEventListener('click', () => { toggleDone(day.slot, sid, s.title); openSession(i, sid); });
-  $('btnNoteSave').addEventListener('click', () => { saveNote(day.slot, sid, $('fNote').value, s.title); });
+  $('btnDone').addEventListener('click', () => { saveSessionLog(day.slot, sid, ds, s.title, $('fNote').value, collectLoads(), true); openSession(i, sid); });
+  $('btnNoteSave').addEventListener('click', () => { saveSessionLog(day.slot, sid, ds, s.title, $('fNote').value, collectLoads(), false); });
+  el.sheetBody.querySelectorAll('.loadin').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); inp.blur(); } }));
+  el.sheetBody.querySelectorAll('.rpebtn').forEach(b => b.addEventListener('click', () => { const was = b.classList.contains('on'); b.parentElement.querySelectorAll('.rpebtn').forEach(x => x.classList.remove('on')); if (!was) b.classList.add('on'); }));
+  el.sheetBody.querySelectorAll('.sug').forEach(b => b.addEventListener('click', () => { const inp = el.sheetBody.querySelector('.loadin[data-key="' + CSS.escape(b.dataset.key) + '"]'); if (inp){ inp.value = b.dataset.v; inp.focus(); } }));
   openOverlay(el.sheet);
 }
 function openBlock(){
