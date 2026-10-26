@@ -24,7 +24,8 @@ function normalizeState(raw){
   return { version:1,
     weekOrders: (s.weekOrders && typeof s.weekOrders === 'object') ? s.weekOrders : {},
     done: (s.done && typeof s.done === 'object') ? s.done : {},
-    notes: (s.notes && typeof s.notes === 'object') ? s.notes : {} };
+    notes: (s.notes && typeof s.notes === 'object') ? s.notes : {},
+    loads: (s.loads && typeof s.loads === 'object') ? s.loads : {} };
 }
 function blockWeeks(b){ return Array.isArray(b.weeks) && b.weeks.length ? b.weeks.length : 4; }
 /* Which block covers the week starting on wsStr (a Monday), and which week of it is that. */
@@ -56,6 +57,22 @@ function resolveItem(item, weekIdx){
   const thisWeek = (item.byWeek && item.byWeek[String(weekIdx)]) || null;
   return { name:item.name || '', sets:item.sets || '', effort:item.effort || '', detail:item.detail || '', video:item.video || '', thisWeek, hasByWeek: !!item.byWeek };
 }
+/* Per-exercise load log: state.loads[sid|name] = [{d:'YYYY-MM-DD', v:'95 lb'}, ...], oldest first. */
+function loadKey(sid, name){ return sid + '|' + String(name || '').trim(); }
+function loadEntries(state, key){ const a = state.loads && state.loads[key]; return Array.isArray(a) ? a : []; }
+function loadOn(state, key, ds){ return (loadEntries(state, key).find(e => e && e.d === ds) || {}).v || ''; }
+function loadsBefore(state, key, ds){ return loadEntries(state, key).filter(e => e && e.d < ds).sort((x, y) => x.d < y.d ? 1 : x.d > y.d ? -1 : 0); }
+function setLoad(state, key, ds, value){
+  const v = String(value || '').trim();
+  let a = loadEntries(state, key).filter(e => e && e.d !== ds);
+  if (v) a.push({ d: ds, v });
+  a.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : 0);
+  if (a.length > 16) a = a.slice(a.length - 16);
+  if (!state.loads) state.loads = {};
+  if (a.length) state.loads[key] = a; else delete state.loads[key];
+}
+/* Which sessions get a load field on each exercise: lifts, the hangboard, or anything flagged logLoads. */
+function sessionLogsLoads(s){ return !!s && (s.kind === 'lift' || s.logLoads === true || /hang/i.test(s.title || '')); }
 function validateBlock(b){
   const errs = [];
   if (!b || typeof b !== 'object') return ['Not a JSON object.'];
@@ -203,17 +220,25 @@ function toggleDone(slot, sid, title){
   const now = !S.state.done[k];
   persist(st => { if (now) st.done[k] = true; else delete st.done[k]; }, (now ? 'done: ' : 'undo: ') + title);
 }
-function saveNote(slot, sid, text, title){
+/* One save for the whole session sheet: note + every load field (+ optionally flip done). */
+function saveSessionLog(slot, sid, ds, title, note, loads, flipDone){
   const k = keyFor(wsStr(), slot, sid);
-  const t = (text || '').trim();
-  persist(st => { if (t) st.notes[k] = t; else delete st.notes[k]; }, 'note: ' + title);
-  toast(t ? 'Note saved' : 'Note cleared');
+  const t = (note || '').trim();
+  const willDone = flipDone ? !S.state.done[k] : null;
+  persist(st => {
+    if (t) st.notes[k] = t; else delete st.notes[k];
+    for (const key of Object.keys(loads || {})) setLoad(st, key, ds, loads[key]);
+    if (willDone !== null){ if (willDone) st.done[k] = true; else delete st.done[k]; }
+  }, (willDone === null ? 'log: ' : (willDone ? 'done: ' : 'undo: ')) + title);
+  if (willDone === null) toast('Saved');
 }
 function pruneState(st){
   const keep = fmtDate(addDays(startOfWeek(new Date()), -7 * 26));
   for (const k of Object.keys(st.weekOrders)) if (k < keep) delete st.weekOrders[k];
   for (const k of Object.keys(st.done)) if (k.slice(0,10) < keep) delete st.done[k];
   for (const k of Object.keys(st.notes)) if (k.slice(0,10) < keep) delete st.notes[k];
+  if (!st.loads) st.loads = {};
+  for (const k of Object.keys(st.loads)){ const a = st.loads[k]; if (!Array.isArray(a) || !a.length) delete st.loads[k]; else if (a.length > 16) st.loads[k] = a.slice(-16); }
 }
 async function persist(mutator, summary){
   mutator(S.state);
