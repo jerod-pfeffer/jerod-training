@@ -62,14 +62,30 @@ function loadKey(sid, name){ return sid + '|' + String(name || '').trim(); }
 function loadEntries(state, key){ const a = state.loads && state.loads[key]; return Array.isArray(a) ? a : []; }
 function loadOn(state, key, ds){ return (loadEntries(state, key).find(e => e && e.d === ds) || {}).v || ''; }
 function loadsBefore(state, key, ds){ return loadEntries(state, key).filter(e => e && e.d < ds).sort((x, y) => x.d < y.d ? 1 : x.d > y.d ? -1 : 0); }
-function setLoad(state, key, ds, value){
+function setLoad(state, key, ds, value, rpe){
   const v = String(value || '').trim();
+  const r = Number(rpe); const hasR = Number.isFinite(r) && r >= 1 && r <= 10;
   let a = loadEntries(state, key).filter(e => e && e.d !== ds);
-  if (v) a.push({ d: ds, v });
+  if (v || hasR){ const e = { d: ds, v }; if (hasR) e.r = r; a.push(e); }
   a.sort((x, y) => x.d < y.d ? -1 : x.d > y.d ? 1 : 0);
   if (a.length > 16) a = a.slice(a.length - 16);
   if (!state.loads) state.loads = {};
   if (a.length) state.loads[key] = a; else delete state.loads[key];
+}
+/* Next-session suggestion from the last entry: RPE <= 6 adds a step, 7 holds, 8+ holds (and is over the block's cap). */
+function suggestNext(entry){
+  if (!entry || !entry.v) return null;
+  const m = /^\s*(?:bw\s*\+\s*)?(\d+(?:\.\d+)?)\s*(lb|lbs|kg)\b(.*)$/i.exec(entry.v);
+  if (!m) return { v: entry.v, why: 'repeat' };
+  const n = parseFloat(m[1]); const unit = m[2].toLowerCase().replace('lbs','lb'); const rest = (m[3] || '').trim();
+  const bells = [8,12,16,20,24,28,32,36,40,44,48];
+  const step = unit === 'kg' ? (bells.includes(n) ? ((bells[bells.indexOf(n) + 1] || n + 4) - n) : 2.5) : 5;
+  const prefix = /^\s*bw/i.test(entry.v) ? 'BW+' : '';
+  const fmt = x => prefix + (Math.round(x * 10) / 10) + ' ' + unit + (rest ? ' ' + rest : '');
+  if (!Number.isFinite(entry.r)) return { v: fmt(n), why: 'repeat' };
+  if (entry.r <= 6) return { v: fmt(n + step), why: 'up' };
+  if (entry.r >= 8) return { v: fmt(n), why: 'hold-cap' };
+  return { v: fmt(n), why: 'hold' };
 }
 /* Which sessions get a load field on each exercise: lifts, the hangboard, or anything flagged logLoads. */
 function sessionLogsLoads(s){ return !!s && (s.kind === 'lift' || s.logLoads === true || /hang/i.test(s.title || '')); }
@@ -227,7 +243,7 @@ function saveSessionLog(slot, sid, ds, title, note, loads, flipDone){
   const willDone = flipDone ? !S.state.done[k] : null;
   persist(st => {
     if (t) st.notes[k] = t; else delete st.notes[k];
-    for (const key of Object.keys(loads || {})) setLoad(st, key, ds, loads[key]);
+    for (const key of Object.keys(loads || {})){ const x = loads[key] || {}; setLoad(st, key, ds, x.v, x.r); }
     if (willDone !== null){ if (willDone) st.done[k] = true; else delete st.done[k]; }
   }, (willDone === null ? 'log: ' : (willDone ? 'done: ' : 'undo: ')) + title);
   if (willDone === null) toast('Saved');
