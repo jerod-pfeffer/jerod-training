@@ -25,7 +25,8 @@ function normalizeState(raw){
     weekOrders: (s.weekOrders && typeof s.weekOrders === 'object') ? s.weekOrders : {},
     done: (s.done && typeof s.done === 'object') ? s.done : {},
     notes: (s.notes && typeof s.notes === 'object') ? s.notes : {},
-    loads: (s.loads && typeof s.loads === 'object') ? s.loads : {} };
+    loads: (s.loads && typeof s.loads === 'object') ? s.loads : {},
+    skipped: (s.skipped && typeof s.skipped === 'object') ? s.skipped : {} };
 }
 function blockWeeks(b){ return Array.isArray(b.weeks) && b.weeks.length ? b.weeks.length : 4; }
 /* Which block covers the week starting on wsStr (a Monday), and which week of it is that. */
@@ -51,6 +52,14 @@ function orderFor(state, wsStr){
 function swapSlots(order, i, j){ const o = order.slice(); const t = o[i]; o[i] = o[j]; o[j] = t; return o; }
 function isDefaultOrder(order){ return order.join() === '0,1,2,3,4,5,6'; }
 function keyFor(wsStr, slot, sid){ return wsStr + '|' + slot + '|' + sid; }
+/* Whole-day record: state.skipped[ws|slot] = reason ('travel', 'sick', ...). A day is done when every session is. */
+function dayKey(wsStr, slot){ return wsStr + '|' + slot; }
+function dayStatus(state, wsStr, slot, sids){
+  if (state.skipped && state.skipped[dayKey(wsStr, slot)]) return 'skipped';
+  if (!sids.length) return 'none';
+  const n = sids.filter(sid => state.done[keyFor(wsStr, slot, sid)]).length;
+  return n === sids.length ? 'done' : (n ? 'partial' : 'open');
+}
 /* Resolve one exercise line for the given week of the block. */
 function resolveItem(item, weekIdx){
   if (Array.isArray(item.weeks) && !item.weeks.includes(weekIdx)) return null;
@@ -221,6 +230,20 @@ function dayAt(cur, order, i){
   return { slot, dtId, dt, sessions: (dt.sessions || []).map(sid => ({ sid, s: cur.block.sessions[sid] })).filter(x => x.s) };
 }
 function isDone(slot, sid){ return !!S.state.done[keyFor(wsStr(), slot, sid)]; }
+function skipReason(slot){ return S.state.skipped[dayKey(wsStr(), slot)] || ''; }
+/* Tally of training days in the shown week: done / skipped / still open. */
+function weekTally(cur){
+  const order = orderFor(S.state, wsStr());
+  const t = { done:0, skipped:0, open:0, total:0 };
+  for (let i = 0; i < 7; i++){
+    const day = dayAt(cur, order, i);
+    if (!day.sessions.length) continue;
+    t.total++;
+    const st = dayStatus(S.state, wsStr(), day.slot, day.sessions.map(x => x.sid));
+    if (st === 'done') t.done++; else if (st === 'skipped') t.skipped++; else t.open++;
+  }
+  return t;
+}
 function noteFor(slot, sid){ return S.state.notes[keyFor(wsStr(), slot, sid)] || ''; }
 
 /* ── Mutations ── */
@@ -232,10 +255,26 @@ function moveDay(i, j){
 }
 function resetWeek(){ persist(st => { delete st.weekOrders[wsStr()]; }, 'reset week ' + wsStr()); }
 function toggleDone(slot, sid, title){
-  const k = keyFor(wsStr(), slot, sid);
+  const k = keyFor(wsStr(), slot, sid), dk = dayKey(wsStr(), slot);
   const now = !S.state.done[k];
-  persist(st => { if (now) st.done[k] = true; else delete st.done[k]; }, (now ? 'done: ' : 'undo: ') + title);
+  persist(st => { if (now){ st.done[k] = true; delete st.skipped[dk]; } else delete st.done[k]; }, (now ? 'done: ' : 'undo: ') + title);
 }
+/* Whole day in one tap: every session done (clears a skip), or all undone. */
+function setDayDone(slot, sids, on, label){
+  const dk = dayKey(wsStr(), slot);
+  persist(st => {
+    for (const sid of sids){ const k = keyFor(wsStr(), slot, sid); if (on) st.done[k] = true; else delete st.done[k]; }
+    if (on) delete st.skipped[dk];
+  }, (on ? 'day done: ' : 'day undo: ') + label);
+}
+function skipDay(slot, sids, reason, label){
+  const dk = dayKey(wsStr(), slot);
+  persist(st => {
+    st.skipped[dk] = reason || 'skipped';
+    for (const sid of sids) delete st.done[keyFor(wsStr(), slot, sid)];
+  }, 'skip (' + (reason || 'skipped') + '): ' + label);
+}
+function unskipDay(slot, label){ const dk = dayKey(wsStr(), slot); persist(st => { delete st.skipped[dk]; }, 'unskip: ' + label); }
 /* One save for the whole session sheet: note + every load field (+ optionally flip done). */
 function saveSessionLog(slot, sid, ds, title, note, loads, flipDone){
   const k = keyFor(wsStr(), slot, sid);
@@ -244,7 +283,7 @@ function saveSessionLog(slot, sid, ds, title, note, loads, flipDone){
   persist(st => {
     if (t) st.notes[k] = t; else delete st.notes[k];
     for (const key of Object.keys(loads || {})){ const x = loads[key] || {}; setLoad(st, key, ds, x.v, x.r); }
-    if (willDone !== null){ if (willDone) st.done[k] = true; else delete st.done[k]; }
+    if (willDone !== null){ if (willDone){ st.done[k] = true; delete st.skipped[dayKey(wsStr(), slot)]; } else delete st.done[k]; }
   }, (willDone === null ? 'log: ' : (willDone ? 'done: ' : 'undo: ')) + title);
 }
 function pruneState(st){
@@ -252,6 +291,8 @@ function pruneState(st){
   for (const k of Object.keys(st.weekOrders)) if (k < keep) delete st.weekOrders[k];
   for (const k of Object.keys(st.done)) if (k.slice(0,10) < keep) delete st.done[k];
   for (const k of Object.keys(st.notes)) if (k.slice(0,10) < keep) delete st.notes[k];
+  if (!st.skipped) st.skipped = {};
+  for (const k of Object.keys(st.skipped)) if (k.slice(0,10) < keep) delete st.skipped[k];
   if (!st.loads) st.loads = {};
   for (const k of Object.keys(st.loads)){ const a = st.loads[k]; if (!Array.isArray(a) || !a.length) delete st.loads[k]; else if (a.length > 16) st.loads[k] = a.slice(-16); }
 }
