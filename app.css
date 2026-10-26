@@ -176,6 +176,9 @@
   .ex .load .last small{color:var(--dim); font-size:11px;}
   .ex .load .sug{display:inline-block; text-align:left; color:var(--teal); font-size:12px; font-weight:600; min-height:24px; padding:1px 0;}
   .ex .load .sug b{color:var(--teal); font-weight:700;}
+  .ex .load .sug small{color:var(--dim); font-weight:500; font-size:11px;}
+  .ex .load .sug.on{color:var(--sage);}
+  .ex .load .sug.on small{color:var(--sage);}
   .ex .rpe{display:inline-flex; align-items:center; gap:6px; margin-top:6px;}
   .ex .rpe em{font-style:normal; font-family:var(--disp); font-weight:600; font-size:11px; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-right:2px;}
   .ex .rpebtn{min-width:38px; min-height:32px; border-radius:8px; border:1px solid var(--line2); background:var(--panel2); color:var(--mut); font-family:var(--disp); font-weight:600; font-size:15px;}
