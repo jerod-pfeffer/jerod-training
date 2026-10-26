@@ -137,7 +137,7 @@ function openSession(i, sid){
           const sug = suggestNext(prev[0]);
           const why = sug ? ({ up:'try', hold:'hold at', 'hold-cap':'hold \u2014 over the cap at', repeat:'repeat' })[sug.why] : '';
           last = '<span class="last"><span>Last <b>' + fmtE(prev[0]) + '</b> \u00b7 ' + fmtShort(prev[0].d) + '</span>' +
-            (sug && sug.v ? '<button type="button" class="sug" data-key="' + escapeHtml(key) + '" data-v="' + escapeHtml(sug.v) + '">\u2192 ' + why + ' <b>' + escapeHtml(sug.v) + '</b></button>' : '') +
+            (sug && sug.v ? '<button type="button" class="sug" data-key="' + escapeHtml(key) + '" data-v="' + escapeHtml(sug.v) + '">\u2192 ' + why + ' <b>' + escapeHtml(sug.v) + '</b> <small>tap to log</small></button>' : '') +
             (prev[1] ? '<small>Before: ' + fmtE(prev[1]) + ' \u00b7 ' + fmtShort(prev[1].d) + '</small>' : '') + '</span>';
         } else last = '<span class="last"><small>First time \u2014 write the load you used, tap the RPE</small></span>';
         let chips = '<span class="rpe" data-key="' + escapeHtml(key) + '"><em>RPE</em>';
@@ -158,12 +158,21 @@ function openSession(i, sid){
     el.sheetBody.querySelectorAll('.rpe').forEach(g => { const on = g.querySelector('.rpebtn.on'); if (on && o[g.dataset.key]) o[g.dataset.key].r = +on.dataset.r; });
     return o;
   };
+  const quickSave = () => saveSessionLog(day.slot, sid, ds, s.title, $('fNote').value, collectLoads(), false);
   $('btnBack').addEventListener('click', () => openDay(i));
   $('btnDone').addEventListener('click', () => { saveSessionLog(day.slot, sid, ds, s.title, $('fNote').value, collectLoads(), true); openSession(i, sid); });
-  $('btnNoteSave').addEventListener('click', () => { saveSessionLog(day.slot, sid, ds, s.title, $('fNote').value, collectLoads(), false); });
-  el.sheetBody.querySelectorAll('.loadin').forEach(inp => inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); inp.blur(); } }));
-  el.sheetBody.querySelectorAll('.rpebtn').forEach(b => b.addEventListener('click', () => { const was = b.classList.contains('on'); b.parentElement.querySelectorAll('.rpebtn').forEach(x => x.classList.remove('on')); if (!was) b.classList.add('on'); }));
-  el.sheetBody.querySelectorAll('.sug').forEach(b => b.addEventListener('click', () => { const inp = el.sheetBody.querySelector('.loadin[data-key="' + CSS.escape(b.dataset.key) + '"]'); if (inp){ inp.value = b.dataset.v; inp.focus(); } }));
+  $('btnNoteSave').addEventListener('click', () => { quickSave(); toast('Saved'); });
+  /* Typed loads save when you leave the field; RPE taps and accepted suggestions save on the tap — no keyboard needed. */
+  el.sheetBody.querySelectorAll('.loadin').forEach(inp => {
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter'){ e.preventDefault(); inp.blur(); } });
+    inp.addEventListener('change', quickSave);
+  });
+  el.sheetBody.querySelectorAll('.rpebtn').forEach(b => b.addEventListener('click', () => { const was = b.classList.contains('on'); b.parentElement.querySelectorAll('.rpebtn').forEach(x => x.classList.remove('on')); if (!was) b.classList.add('on'); quickSave(); }));
+  el.sheetBody.querySelectorAll('.sug').forEach(b => b.addEventListener('click', () => {
+    const inp = el.sheetBody.querySelector('.loadin[data-key="' + CSS.escape(b.dataset.key) + '"]'); if (!inp) return;
+    inp.value = b.dataset.v; b.classList.add('on'); b.innerHTML = '\u2713 ' + escapeHtml(b.dataset.v) + ' <small>saved</small>';
+    quickSave();
+  }));
   openOverlay(el.sheet);
 }
 function openBlock(){
