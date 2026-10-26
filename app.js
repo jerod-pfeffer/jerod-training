@@ -64,7 +64,7 @@ function dayStatus(state, wsStr, slot, sids){
 function resolveItem(item, weekIdx){
   if (Array.isArray(item.weeks) && !item.weeks.includes(weekIdx)) return null;
   const thisWeek = (item.byWeek && item.byWeek[String(weekIdx)]) || null;
-  return { name:item.name || '', sets:item.sets || '', effort:item.effort || '', detail:item.detail || '', video:item.video || '', thisWeek, hasByWeek: !!item.byWeek };
+  return { name:item.name || '', sets:item.sets || '', effort:item.effort || '', detail:item.detail || '', video:item.video || '', thisWeek, hasByWeek: !!item.byWeek, load: item.load === true };
 }
 /* Per-exercise load log: state.loads[sid|name] = [{d:'YYYY-MM-DD', v:'95 lb'}, ...], oldest first. */
 function loadKey(sid, name){ return sid + '|' + String(name || '').trim(); }
@@ -96,8 +96,8 @@ function suggestNext(entry){
   if (entry.r >= 8) return { v: fmt(n), why: 'hold-cap' };
   return { v: fmt(n), why: 'hold' };
 }
-/* Which sessions get a load field on each exercise: lifts, the hangboard, or anything flagged logLoads. */
-function sessionLogsLoads(s){ return !!s && (s.kind === 'lift' || s.logLoads === true || /hang/i.test(s.title || '')); }
+/* Load + RPE boxes appear only on exercises flagged "load": true in the program (barbell and kettlebell lifts). */
+function sessionLogsLoads(s){ return !!s && (s.blocks || []).some(b => (b.items || []).some(it => it && it.load === true)); }
 function validateBlock(b){
   const errs = [];
   if (!b || typeof b !== 'object') return ['Not a JSON object.'];
