@@ -94,9 +94,9 @@ function openDay(i){
     if (dst === 'skipped'){
       h += '<div class="dayact"><div class="daystate skip">Skipped \u00b7 ' + escapeHtml(skipReason(day.slot)) + '</div><button class="btn ghost" id="btnUnskip">Undo skip</button></div>';
     } else if (dst === 'done'){
-      h += '<div class="dayact"><button class="donebtn is-done" id="btnDayUndo">\u2713 Day done \u2014 tap to undo</button></div>';
+      h += '<div class="dayact"><button class="donebtn is-done" id="btnDayUndo">\u2713 Done \u2014 tap to undo</button></div>';
     } else {
-      h += '<div class="dayact"><button class="donebtn" id="btnDayDone">\u2713 Whole day done</button><button class="btn ghost" id="btnSkip">Skip day</button></div>' +
+      h += '<div class="dayact"><button class="donebtn" id="btnDayDone">\u2713 Done</button><button class="btn ghost" id="btnSkip">Skip</button></div>' +
         '<div class="skipreasons" id="skipReasons" hidden><em>Why?</em>' + ['travel','sick','tired','life'].map(r => '<button type="button" class="reason" data-r="' + r + '">' + r + '</button>').join('') + '</div>';
     }
   }
@@ -149,7 +149,7 @@ function openSession(i, sid){
       if (it.thisWeek) h += '<p class="exw">' + escapeHtml(it.thisWeek) + '</p>';
       if (it.detail) h += '<p class="exd">' + escapeHtml(it.detail) + '</p>';
       if (it.video) h += '<a class="vid" href="' + escapeHtml(it.video) + '" target="_blank" rel="noopener">Watch how</a>';
-      if (logs && (it.sets || it.hasByWeek)){
+      if (it.load){
         const key = loadKey(sid, it.name);
         const today = loadEntries(S.state, key).find(e => e && e.d === ds) || {};
         const prev = loadsBefore(S.state, key, ds);
