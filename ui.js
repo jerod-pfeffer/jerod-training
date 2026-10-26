@@ -19,8 +19,10 @@ function renderBlockStrip(cur){
   }
   bs.classList.remove('empty');
   const w = (cur.block.weeks || [])[cur.weekIdx - 1] || {};
+  const t = weekTally(cur);
+  const tally = t.total ? '<p class="bs-tally"><b class="d">' + t.done + ' done</b>' + (t.skipped ? ' \u00b7 <b class="s">' + t.skipped + ' skipped</b>' : '') + ' \u00b7 ' + t.open + ' to go' + ' <small>of ' + t.total + ' training days</small></p>' : '';
   bs.innerHTML = '<div class="bs-top"><span class="bs-week">Week <b>' + cur.weekIdx + '</b> of ' + cur.nWeeks + (w.label ? ' \u00b7 ' + escapeHtml(w.label) : '') + '</span><span class="bs-name">' + escapeHtml(cur.block.name) + '</span></div>' +
-    (w.focus ? '<p class="bs-focus">' + escapeHtml(w.focus) + '</p>' : '');
+    (w.focus ? '<p class="bs-focus">' + escapeHtml(w.focus) + '</p>' : '') + tally;
 }
 function renderSpine(cur){
   const todayStr = fmtDate(new Date());
@@ -38,13 +40,14 @@ function renderSpine(cur){
       const total = day.sessions.length;
       const doneN = day.sessions.filter(x => isDone(day.slot, x.sid)).length;
       const moved = day.slot !== i;
+      const skip = total ? skipReason(day.slot) : '';
       let chips = '';
       for (const x of day.sessions){
         const dn = isDone(day.slot, x.sid);
         chips += '<span class="chip' + (dn ? ' done' : '') + '"><i>' + (dn ? '\u2713' : '') + '</i>' + escapeHtml(x.s.title) + '</span>';
       }
-      h += '<button class="card' + (total && doneN === total ? ' alldone' : '') + '" data-kind="' + escapeHtml(day.dt.kind || 'rest') + '" data-idx="' + i + '" aria-label="' + DOWFULL[i] + ' ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ': ' + escapeHtml(day.dt.label) + (moved ? ', moved from ' + DOWFULL[day.slot] : '') + '">' +
-        (moved ? '<span class="moved">from ' + DOWS[day.slot] + '</span>' : '') +
+      h += '<button class="card' + (skip ? ' skipped' : (total && doneN === total ? ' alldone' : '')) + '" data-kind="' + escapeHtml(day.dt.kind || 'rest') + '" data-idx="' + i + '" aria-label="' + DOWFULL[i] + ' ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + ': ' + escapeHtml(day.dt.label) + (skip ? ', skipped (' + escapeHtml(skip) + ')' : (total && doneN === total ? ', done' : '')) + (moved ? ', moved from ' + DOWFULL[day.slot] : '') + '">' +
+        (skip ? '<span class="moved tag-skip">skipped \u00b7 ' + escapeHtml(skip) + '</span>' : (total && doneN === total ? '<span class="moved tag-done">\u2713 done</span>' : (moved ? '<span class="moved">from ' + DOWS[day.slot] + '</span>' : ''))) +
         '<span class="ttl">' + escapeHtml(day.dt.label) + '</span>' +
         '<span class="chips">' + chips + '</span></button>' +
         '<button class="grip" data-idx="' + i + '" aria-label="Drag to move ' + DOWFULL[i] + '"><svg width="14" height="18" viewBox="0 0 14 18" fill="currentColor"><circle cx="4" cy="3" r="1.6"/><circle cx="10" cy="3" r="1.6"/><circle cx="4" cy="9" r="1.6"/><circle cx="10" cy="9" r="1.6"/><circle cx="4" cy="15" r="1.6"/><circle cx="10" cy="15" r="1.6"/></svg></button>';
@@ -82,8 +85,21 @@ function openDay(i){
   const day = dayAt(cur, order, i);
   const d = addDays(S.weekStart, i);
   S.open = { kind:'day', i };
+  const sids = day.sessions.map(x => x.sid);
+  const dst = dayStatus(S.state, wsStr(), day.slot, sids);
+  const label = DOWS[i] + ' ' + MONTHS[d.getMonth()] + ' ' + d.getDate();
   let h = '<h2 class="sh-title">' + DOWFULL[i] + ', ' + MONTHS[d.getMonth()] + ' ' + d.getDate() + '</h2>' +
     '<p class="sh-sub">' + escapeHtml(day.dt.label) + (day.slot !== i ? ' \u2014 moved here from ' + DOWFULL[day.slot] : '') + (day.dt.note ? '. ' + escapeHtml(day.dt.note) : '') + '</p>';
+  if (sids.length){
+    if (dst === 'skipped'){
+      h += '<div class="dayact"><div class="daystate skip">Skipped \u00b7 ' + escapeHtml(skipReason(day.slot)) + '</div><button class="btn ghost" id="btnUnskip">Undo skip</button></div>';
+    } else if (dst === 'done'){
+      h += '<div class="dayact"><button class="donebtn is-done" id="btnDayUndo">\u2713 Day done \u2014 tap to undo</button></div>';
+    } else {
+      h += '<div class="dayact"><button class="donebtn" id="btnDayDone">\u2713 Whole day done</button><button class="btn ghost" id="btnSkip">Skip day</button></div>' +
+        '<div class="skipreasons" id="skipReasons" hidden><em>Why?</em>' + ['travel','sick','tired','life'].map(r => '<button type="button" class="reason" data-r="' + r + '">' + r + '</button>').join('') + '</div>';
+    }
+  }
   h += '<div class="slist">';
   for (const x of day.sessions){
     const dn = isDone(day.slot, x.sid);
@@ -100,6 +116,12 @@ function openDay(i){
   if (!isDefaultOrder(order)) h += '<div class="sh-actions"><button class="btn ghost" id="btnResetWeek">Reset week to plan</button></div>';
   el.sheetBody.innerHTML = h;
   el.sheetBody.querySelectorAll('.srow').forEach(b => b.addEventListener('click', () => openSession(i, b.dataset.sid)));
+  const bDone = $('btnDayDone'), bUndo = $('btnDayUndo'), bSkip = $('btnSkip'), bUnskip = $('btnUnskip');
+  if (bDone) bDone.addEventListener('click', () => { setDayDone(day.slot, sids, true, label); openDay(i); });
+  if (bUndo) bUndo.addEventListener('click', () => { setDayDone(day.slot, sids, false, label); openDay(i); });
+  if (bSkip) bSkip.addEventListener('click', () => { const r = $('skipReasons'); r.hidden = !r.hidden; });
+  if (bUnskip) bUnskip.addEventListener('click', () => { unskipDay(day.slot, label); openDay(i); });
+  el.sheetBody.querySelectorAll('.reason').forEach(b => b.addEventListener('click', () => { skipDay(day.slot, sids, b.dataset.r, label); openDay(i); }));
   el.sheetBody.querySelectorAll('.movebtn').forEach(b => b.addEventListener('click', () => { moveDay(i, +b.dataset.to); closeOverlays(); }));
   const r = $('btnResetWeek'); if (r) r.addEventListener('click', () => { resetWeek(); closeOverlays(); });
   openOverlay(el.sheet);
